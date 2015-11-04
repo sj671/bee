@@ -50,6 +50,8 @@ type MysqlDB struct {
 type PostgresDB struct {
 }
 
+var PgSchemaName string
+
 // dbDriver maps a DBMS name to its version of DbTransformer
 var dbDriver = map[string]DbTransformer{
 	"mysql":    &MysqlDB{},
@@ -301,6 +303,11 @@ func gen(dbms, connStr string, mode byte, selectedTableNames map[string]bool, cu
 	defer db.Close()
 	if trans, ok := dbDriver[dbms]; ok {
 		ColorLog("[INFO] Analyzing database tables...\n")
+
+		if dbms == "postgres" {
+			PgSchemaName = pgschema.String()
+		}
+
 		tableNames := trans.GetTableNames(db)
 		tables := getTableObjects(tableNames, db, trans)
 		mvcPath := new(MvcPath)
@@ -513,10 +520,12 @@ func (*MysqlDB) GetGoDataType(sqlType string) (goType string) {
 }
 
 // GetTableNames for PostgreSQL
-func (*PostgresDB) GetTableNames(db *sql.DB) (tables []string) {
+func (pg *PostgresDB) GetTableNames(db *sql.DB) (tables []string) {
+	schemaName := pg.GetSchemaName()
+
 	rows, err := db.Query(`
 		SELECT table_name FROM information_schema.tables
-		WHERE table_catalog = current_database() and table_schema = 'public'`)
+		WHERE table_catalog = current_database() and table_schema = '` + schemaName + `'`)
 	if err != nil {
 		ColorLog("[ERRO] Could not show tables: %s\n", err)
 		ColorLog("[HINT] Check your connection string\n")
@@ -534,8 +543,20 @@ func (*PostgresDB) GetTableNames(db *sql.DB) (tables []string) {
 	return
 }
 
+func (pg *PostgresDB) GetSchemaName() string {
+
+	if PgSchemaName != "" {
+		return PgSchemaName
+	}
+
+	return "public"
+
+}
+
 // GetConstraints for PostgreSQL
-func (*PostgresDB) GetConstraints(db *sql.DB, table *Table, blackList map[string]bool) {
+func (pg *PostgresDB) GetConstraints(db *sql.DB, table *Table, blackList map[string]bool) {
+	schemaName := pg.GetSchemaName()
+
 	rows, err := db.Query(
 		`SELECT
 			c.constraint_type,
@@ -551,8 +572,8 @@ func (*PostgresDB) GetConstraints(db *sql.DB, table *Table, blackList map[string
 		INNER JOIN
 			information_schema.constraint_column_usage cu ON cu.constraint_name =  c.constraint_name
 		WHERE
-			c.table_catalog = current_database() AND c.table_schema = 'public' AND c.table_name = $1
-			AND u.table_catalog = current_database() AND u.table_schema = 'public' AND u.table_name = $2`,
+			c.table_catalog = current_database() AND c.table_schema = '`+schemaName+`' AND c.table_name = $1
+			AND u.table_catalog = current_database() AND u.table_schema = '`+schemaName+`' AND u.table_name = $2`,
 		table.Name, table.Name) //  u.position_in_unique_constraint,
 	if err != nil {
 		ColorLog("[ERRO] Could not query INFORMATION_SCHEMA for PK/UK/FK information: %s\n", err)
@@ -591,6 +612,8 @@ func (*PostgresDB) GetConstraints(db *sql.DB, table *Table, blackList map[string
 
 // GetColumns for PostgreSQL
 func (postgresDB *PostgresDB) GetColumns(db *sql.DB, table *Table, blackList map[string]bool) {
+	schemaName := postgresDB.GetSchemaName()
+
 	// retrieve columns
 	colDefRows, _ := db.Query(
 		`SELECT
@@ -608,7 +631,7 @@ func (postgresDB *PostgresDB) GetColumns(db *sql.DB, table *Table, blackList map
 		FROM
 			information_schema.columns
 		WHERE
-			table_catalog = current_database() AND table_schema = 'public' AND table_name = $1`,
+			table_catalog = current_database() AND table_schema = '`+schemaName+`' AND table_name = $1`,
 		table.Name)
 	defer colDefRows.Close()
 	for colDefRows.Next() {

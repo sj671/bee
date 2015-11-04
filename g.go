@@ -47,8 +47,9 @@ bee generate docs
 bee generate test [routerfile]
     generate testcase
 
-bee generate appcode [-tables=""] [-driver=mysql] [-conn="root:@tcp(127.0.0.1:3306)/test"] [-level=3]
+bee generate appcode [-pgschema=""] [-tables=""] [-driver=mysql] [-conn="root:@tcp(127.0.0.1:3306)/test"] [-level=3]
     generate appcode based on an existing database
+    -pgschema: the schema the tables are in, default is the 'public' schema
     -tables: a list of table names separated by ',', default is empty, indicating all tables
     -driver: [mysql | postgres | sqlite], the default is mysql
     -conn:   the connection string used by the driver.
@@ -63,9 +64,11 @@ var conn docValue
 var level docValue
 var tables docValue
 var fields docValue
+var pgschema docValue
 
 func init() {
 	cmdGenerate.Run = generateCode
+	cmdGenerate.Flag.Var(&pgschema, "pgschema", "specify the postgresql schemaname your tables are in to generate model")
 	cmdGenerate.Flag.Var(&tables, "tables", "specify tables to generate model")
 	cmdGenerate.Flag.Var(&driver, "driver", "database driver: mysql, postgresql, etc.")
 	cmdGenerate.Flag.Var(&conn, "conn", "connection string used by the driver to connect to a database instance")

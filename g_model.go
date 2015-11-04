@@ -62,11 +62,11 @@ func getStruct(structname, fields string) (string, error, bool) {
 	for i, v := range fds {
 		kv := strings.SplitN(v, ":", 2)
 		if len(kv) != 2 {
-			return "", errors.New("the filds format is wrong. should key:type,key:type " + v), false
+			return "", errors.New("the fields format is wrong. should be key:type,key:type " + v), false
 		}
 		typ, tag, hastimeinner := getType(kv[1])
 		if typ == "" {
-			return "", errors.New("the filds format is wrong. should key:type,key:type " + v), false
+			return "", errors.New("the fields format is wrong. should be key:type,key:type " + v), false
 		}
 		if i == 0 && strings.ToLower(kv[0]) != "id" {
 			structStr = structStr + "Id     int64     `orm:\"auto\"`\n"
